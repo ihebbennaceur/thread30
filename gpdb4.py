@@ -795,7 +795,7 @@ def download_images(image_urls: List[str], product_id: str, category: str) -> Tu
     while True:
         if bj.periodic():
             break
-        sleep_mcs(10_00) #j'ai changé to 1 ms
+        sleep_mcs(1_000) #j'ai changé to 1 ms
 
     for i in range(len(bj.arequests)):
         iimg = airq2iimg[i]
