@@ -16,14 +16,14 @@ MAX_DOWNLOAD_ATTEMPTS = 2
 BASE_DIR = os.path.join(os.getcwd(), f"/home/iheb/Desktop/IMG2/{fileName}/")
 IMAGE_EXTENSIONS_REGEX = re.compile(r"(?i)(\.jpg|\.jpeg|\.png|\.gif)")
 
-MAX_PRODUCTS_PER_ITER = 5
+MAX_PRODUCTS_PER_ITER = 4
 SUCCESS_THRESHOLD = 0.9  
-MAX_THREADS = 5  # Nombre maximum de threads pour le téléchargement d'images
+MAX_THREADS = 4  # Nombre maximum de threads pour le téléchargement d'images
 
 DB_CONFIG = {
-    "dbname": "new_db2",
-    "user": "new_user2",
-    "password": "nazir",
+    "dbname": "newdb",
+    "user": "new_user",
+    "password": "iheb",
     "host": "localhost",
     "port": 5432
 }
@@ -62,6 +62,98 @@ def create_image_path(img_url: str, product_id: str, index: int, category: str) 
     ext = match.group(0) if match else ".jpg"
     filename = f"{product_id}_{index}{ext}"
     return os.path.join(BASE_DIR, product_id, category, filename)
+
+#old
+def prep_filename2(value, allow_unicode=False):
+  """
+  Modifed version of code in
+  https://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename
+  originally taken from
+  https://github.com/django/django/blob/master/django/utils/text.py
+  """
+  value = str(value)
+  if allow_unicode:
+    value = unicodedata.normalize('NFKC', value)
+  else:
+    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+  value = re.sub(r'[^\w\s.-]', '', value.lower())
+  value = re.sub(r'[-\s]+', '-', value)
+  value = re.sub(r'[._]+', '_', value)
+  return value # .strip('-_')
+
+# Extracts the first match of ptn in str.
+# If ptn contains groups (...), returns the 1st group, otherwise whole match.
+# If not match, returns an empty string.
+def re_extract12(src:str, ptn:str, b_multiline: int = 0):
+  if b_multiline:
+    x = re.search(ptn, src, re.MULTILINE)
+  else:
+    x = re.search(ptn, src)
+  if x is not None:
+    if len(x.groups()) > 0:
+      return x.groups()[0]
+    return x.string[x.start():x.end()]
+  return ""
+
+
+# Returns a string, containing the last part of obj class name.
+def get_strtype92(obj):
+  s = str(type(obj))
+  if s.find(".") >= 0: return re.sub("^.*[.](.+)['].*$", "\\1", s)
+  return re.sub("^[^']*['](.+)['].*$", "\\1", s)
+
+#Converts s to string (if not string yet), than to integer.
+# If anything fails, returns vdflt.
+def conv_str_to_int2(s, vdflt):
+    try: return int(str(s))
+    except: return vdflt
+
+def conv_ensure_float_int_as_int2(x):
+  if isinstance(x, float) and x.is_integer():
+    return int(x)
+  return x
+
+
+# Returns h if it's a dict, otherwise {}.
+def dict_ensure2(h):
+  if not isinstance(h, dict):  h = {}
+  return h
+
+
+def dict_ensure_key2(h, key, value_dflt, b_set_vdflt_if_type_different: bool = False):
+  if not isinstance(h, dict):  h = {}
+  if not (key in h) or (b_set_vdflt_if_type_different and type(h[key]) != type(value_dflt)): h[key]  = value_dflt
+  return h
+
+# Sets terminal value at the end of given path in a dict.
+# 1) h is ensured to be dict.
+# 2) If path is not empty, path is ensured to exist in h, nested dicts are created automatically.
+# 3) If path is not empty, the end value of the path is set to value.
+# Returns 
+#   a) the resulting h (which may differ from the original).
+#   b) b_ret_value == True: returns actual terminal value (existing or assigned)
+def dict_ensure_path_value2(h, path: str, value, pathsep: str = '.', b_ret_value: bool = False):
+  h0 = dict_ensure(h)
+
+  akeys = []
+  if type(path) == list: akeys = path
+  elif type(path) == str: akeys = path.split(pathsep)
+  if len(akeys) == 0: return h0
+
+  h = h0
+  for i in range(0, len(akeys)):
+    k = akeys[i]
+    if i == len(akeys) - 1:
+      h[k] = value
+    else:
+      dict_ensure_key(h, k, {}, True)
+      h = h[k]
+  if b_ret_value: return h[k]
+  return h0
+
+
+
+
 
 def insert_product(product_id: str, product_details: Dict, conn):
     try:
