@@ -8,14 +8,11 @@ import signal
 import psycopg2
 from typing import List, Dict, Tuple
 
-
-fileName=["prod1.json","prod2.json"]
-
-# fileName="product_data.json"
+# Directory containing JSON files
+JSON_DIR = "./jsons"
 
 # Configuration
 MAX_DOWNLOAD_ATTEMPTS = 2
-BASE_DIR = os.path.join(os.getcwd(), f"/home/iheb/Desktop/IMG/{fileName}/")
 IMAGE_EXTENSIONS_REGEX = re.compile(r"(?i)(\.jpg|\.jpeg|\.png|\.gif)")
 
 MAX_PRODUCTS_PER_ITER = 2
@@ -24,8 +21,8 @@ MAX_THREADS = 2  # Nombre maximum de threads pour le téléchargement d'images
 
 DB_CONFIG = {
     "dbname": "newdb",
-    "user": "new_user",
-    "password": "iheb",
+    "user": "new_user2",
+    "password": "nazir",
     "host": "localhost",
     "port": 5432
 }
@@ -39,7 +36,6 @@ def close_db(conn):
         print("[INFO] Database connection closed.")
     except Exception as e:
         print(f"[ERROR] Failed to close database connection: {e}")
-
 
 def handle_exit(signal, frame):
     print("\n[INFO] Gracefully shutting down... Saving progress if needed.")
@@ -59,13 +55,11 @@ def nowutc():
 def sleep_mcs(dt_mcs):
     threading.Event().wait(dt_mcs / 1.e6)
 
-def create_image_path(img_url: str, product_id: str, index: int, category: str) -> str:
+def create_image_path(img_url: str, product_id: str, index: int, category: str, base_dir: str) -> str:
     match = IMAGE_EXTENSIONS_REGEX.search(img_url)
     ext = match.group(0) if match else ".jpg"
     filename = f"{product_id}_{index}{ext}"
-    return os.path.join(BASE_DIR, product_id, category, filename)
-
-
+    return os.path.join(base_dir, product_id, category, filename)
 
 def insert_product(product_id: str, product_details: Dict, conn):
     try:
@@ -156,9 +150,6 @@ def get_downloaded_image_urls(product_id: str, conn) -> set:
     except Exception as e:
         print(f"[ERROR] Impossible de récupérer les images déjà téléchargées pour {product_id}: {e}")
         return set()
-    
-
-       
 
 def download_image(img_url: str, file_path: str) -> bool:
     try:
@@ -176,25 +167,24 @@ def download_image(img_url: str, file_path: str) -> bool:
     finally:
         curl.close()
 
-
 #v2 sku
 # Dictionnaire global pour stocker les URLs d'images et leurs chemins locaux
 image_url_to_local_path = {}
 
-def download_images(image_urls: List[str], product_id: str, category: str) -> Tuple[int, List[Tuple[str, str]], List[int], List]:
+def download_images(image_urls: List[str], product_id: str, category: str, base_dir: str) -> Tuple[int, List[Tuple[str, str]], List[int], List]:
     image_paths = []
     success_count = 0
     success_images = []
     aiimg_err_retry = []
     hiimg_err_final = []  
 
-    product_folder = os.path.join(BASE_DIR, product_id, category)
+    product_folder = os.path.join(base_dir, product_id, category)
     os.makedirs(product_folder, exist_ok=True)
 
     def download_thread(img_url, file_path, idx):
         nonlocal success_count
         # Vérifier si l'URL a déjà été téléchargée
-        if img_url in image_url_to_local_path:
+        if (img_url in image_url_to_local_path):
             success_count += 1
             success_images.append((img_url, image_url_to_local_path[img_url]))
             print(f"[INFO] Image {img_url} already downloaded, using cached path: {image_url_to_local_path[img_url]}")
@@ -209,7 +199,7 @@ def download_images(image_urls: List[str], product_id: str, category: str) -> Tu
 
     threads = []
     for idx, img_url in enumerate(image_urls):
-        file_path = create_image_path(img_url, product_id, idx + 1, category)
+        file_path = create_image_path(img_url, product_id, idx + 1, category, base_dir)
         image_paths.append(file_path)
         full_url = "https:" + img_url if img_url.startswith("//") else img_url
         thread = threading.Thread(target=download_thread, args=(full_url, file_path, idx))
@@ -225,7 +215,6 @@ def download_images(image_urls: List[str], product_id: str, category: str) -> Tu
 
     return success_count, success_images, aiimg_err_retry, hiimg_err_final
 
-
 # Dictionnaire global pour stocker les URLs d'images et leurs chemins locaux
 image_url_to_local_path = {}
 
@@ -235,7 +224,7 @@ def clear_image_cache():
     image_url_to_local_path.clear()
     print("[INFO] Image cache cleared.")
 
-def process_product(product, conn):
+def process_product(product, conn, base_dir: str):
     product_id = product.get("productId")
     if not product_id:
         print(f"[ERROR] Missing 'productId' in product: {product}")
@@ -271,7 +260,7 @@ def process_product(product, conn):
                     update_product_status(product_id, "failed", conn)
                     return
                 
-                dl_count, success_images, err_retry, _ = download_images(current_images, product_id, category)
+                dl_count, success_images, err_retry, _ = download_images(current_images, product_id, category, base_dir)
                 if success_images:
                     insert_images(product_id, category, success_images, conn)
                 
@@ -291,10 +280,15 @@ def process_product(product, conn):
     finally:
         # Vider le cache des images après le traitement du produit
         clear_image_cache()
-
+        
+BASE_DIR = os.path.join(os.getcwd(), f"/home/ta/Desktop/disk19/IMG/")
 
 def process_products_in_batches(json_file: str):
     conn = psycopg2.connect(**DB_CONFIG)
+    base_name = os.path.splitext(os.path.basename(json_file))[0]
+    base_dir = os.path.join(BASE_DIR, base_name)
+    os.makedirs(base_dir, exist_ok=True)
+    
     with open(json_file, "r", encoding="utf-8") as f:
         try:
             data = json.load(f)
@@ -320,7 +314,7 @@ def process_products_in_batches(json_file: str):
 
         threads = []
         for product in current_batch:
-            thread = threading.Thread(target=process_product, args=(product, conn))
+            thread = threading.Thread(target=process_product, args=(product, conn, base_dir))
             threads.append(thread)
             thread.start()
             if len(threads) >= MAX_THREADS:
@@ -337,13 +331,16 @@ def process_products_in_batches(json_file: str):
 if __name__ == "__main__":
     start_time = time.time()
     print(f"[INFO] Start processing at {datetime.now()}")  
-    for ff in fileName:
-        json_file = ff
-        process_products_in_batches(json_file)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
+    
+    # Process all JSON files in the specified directory
+    for json_file in os.listdir(JSON_DIR):
+        if json_file.endswith(".json"):
+            process_products_in_batches(os.path.join(JSON_DIR, json_file))
+    
+    end_time = time.time()
+    elapsed_time = end_time - start_time
 
     print(f"[INFO] Finished processing at {datetime.now()}")
     print(f"[INFO] Total time taken: {elapsed_time:.2f} seconds")
   
-    close_db(conn)  # Fermer la connexion à la base de données
+    close_db(conn)

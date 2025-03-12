@@ -9,23 +9,27 @@ import psycopg2
 from typing import List, Dict, Tuple
 
 
-fileName=["prod1.json","prod2.json"]
 
-# fileName="product_data.json"
+fileName=["products_success_2025-02-11_09-26-56.json",
+"products_success_2025-02-19_17-30-32.json",
+"products_success_2025-02-19_17-31-44.json",
+"products_success_2025-02-21_08-48-00.json",
+"products_success_2025-02-21_08-48-11.json",
+"products_success_2025-02-24_17-37-39.json",
+"products_success_2025-02-27_12-01-27.json"]
 
 # Configuration
 MAX_DOWNLOAD_ATTEMPTS = 2
-BASE_DIR = os.path.join(os.getcwd(), f"/home/iheb/Desktop/IMG/{fileName}/")
 IMAGE_EXTENSIONS_REGEX = re.compile(r"(?i)(\.jpg|\.jpeg|\.png|\.gif)")
 
-MAX_PRODUCTS_PER_ITER = 2
+MAX_PRODUCTS_PER_ITER = 6
 SUCCESS_THRESHOLD = 0.9  
-MAX_THREADS = 2  # Nombre maximum de threads pour le téléchargement d'images
+MAX_THREADS = 6  # Nombre maximum de threads pour le téléchargement d'images
 
 DB_CONFIG = {
-    "dbname": "newdb",
-    "user": "new_user",
-    "password": "iheb",
+    "dbname": "new_db2",
+    "user": "new_user2",
+    "password": "nazir",
     "host": "localhost",
     "port": 5432
 }
@@ -33,6 +37,17 @@ DB_CONFIG = {
 # Database Connection
 conn = psycopg2.connect(**DB_CONFIG)
 cursor = conn.cursor()
+
+
+
+
+
+
+
+
+
+
+
 def close_db(conn):
     try:
         conn.close()
@@ -66,6 +81,67 @@ def create_image_path(img_url: str, product_id: str, index: int, category: str) 
     return os.path.join(BASE_DIR, product_id, category, filename)
 
 
+#old 2
+def prep_filename2(value, allow_unicode=False):
+  """
+  Modifed version of code in
+  https://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename
+  originally taken from
+  https://github.com/django/django/blob/master/django/utils/text.py
+  """
+  value = str(value)
+  if allow_unicode:
+    value = unicodedata.normalize('NFKC', value)
+  else:
+    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+  value = re.sub(r'[^\w\s.-]', '', value.lower())
+  value = re.sub(r'[-\s]+', '-', value)
+  value = re.sub(r'[._]+', '_', value)
+  return value # .strip('-_')
+
+# Extracts the first match of ptn in str.
+# If ptn contains groups (...), returns the 1st group, otherwise whole match.
+# If not match, returns an empty string.
+def re_extract12(src:str, ptn:str, b_multiline: int = 0):
+  if b_multiline:
+    x = re.search(ptn, src, re.MULTILINE)
+  else:
+    x = re.search(ptn, src)
+  if x is not None:
+    if len(x.groups()) > 0:
+      return x.groups()[0]
+    return x.string[x.start():x.end()]
+  return ""
+
+
+# Returns a string, containing the last part of obj class name.
+def get_strtype92(obj):
+  s = str(type(obj))
+  if s.find(".") >= 0: return re.sub("^.*[.](.+)['].*$", "\\1", s)
+  return re.sub("^[^']*['](.+)['].*$", "\\1", s)
+
+#Converts s to string (if not string yet), than to integer.
+# If anything fails, returns vdflt.
+def conv_str_to_int2(s, vdflt):
+    try: return int(str(s))
+    except: return vdflt
+
+def conv_ensure_float_int_as_int2(x):
+  if isinstance(x, float) and x.is_integer():
+    return int(x)
+  return x
+
+
+# Returns h if it's a dict, otherwise {}.
+def dict_ensure2(h):
+  if not isinstance(h, dict):  h = {}
+  return h
+
+
+def dict_ensure_key2(h, key, value_dflt, b_set_vdflt_if_type_different: bool = False):
+  if not isinstance(h, dict):  h = {}
+  if not (key in h) or (b_set_vdflt_if_type_different and type(h[key]) != type(value_dflt)): h[key]  = value_dflt
+  return h
 
 def insert_product(product_id: str, product_details: Dict, conn):
     try:
@@ -339,6 +415,7 @@ if __name__ == "__main__":
     print(f"[INFO] Start processing at {datetime.now()}")  
     for ff in fileName:
         json_file = ff
+        BASE_DIR = os.path.join(os.getcwd(), f"/home/ta/Desktop/disk19/IMG/{fileName}/")
         process_products_in_batches(json_file)
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -346,4 +423,3 @@ if __name__ == "__main__":
     print(f"[INFO] Finished processing at {datetime.now()}")
     print(f"[INFO] Total time taken: {elapsed_time:.2f} seconds")
   
-    close_db(conn)  # Fermer la connexion à la base de données
