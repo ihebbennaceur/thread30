@@ -7,9 +7,12 @@ from datetime import datetime, timedelta, timezone
 import signal
 import psycopg2
 from typing import List, Dict, Tuple
+import shutil  # Import shutil module
 
 # Directory containing JSON files
-JSON_DIR = "./jsons"
+JSON_DIR = "./todo_jsons"
+# Directory to move processed JSON files
+DONE_JSON_DIR = "./finished_jsons"
 
 # Configuration
 MAX_DOWNLOAD_ATTEMPTS = 2
@@ -328,10 +331,17 @@ def process_products_in_batches(json_file: str):
     print("[INFO] All products processed")
     conn.close()
 
+    # Move the processed JSON file to the done_jsons directory
+    shutil.move(json_file, os.path.join(DONE_JSON_DIR, os.path.basename(json_file)))
+    print(f"[INFO] Moved {json_file} to {DONE_JSON_DIR}")
+
 if __name__ == "__main__":
     start_time = time.time()
     print(f"[INFO] Start processing at {datetime.now()}")  
     
+    # Create the done_jsons directory if it doesn't exist
+    os.makedirs(DONE_JSON_DIR, exist_ok=True)
+
     # Process all JSON files in the specified directory
     for json_file in os.listdir(JSON_DIR):
         if json_file.endswith(".json"):
